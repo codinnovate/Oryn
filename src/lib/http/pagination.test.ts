@@ -55,10 +55,16 @@ describe("ZodValidationPipe", () => {
 
   it("returns parsed data on success", () => {
     const value = pipe.transform(
-      { email: "a@b.co", age: "21" },
+      { email: "a@b.co", age: 21 },
       { type: "body", metatype: Object },
     );
     expect(value).toEqual({ email: "a@b.co", age: 21 });
+  });
+
+  it("rejects string-typed numbers (strict parsing)", () => {
+    expect(() =>
+      pipe.transform({ email: "a@b.co", age: "21" }, { type: "body", metatype: Object }),
+    ).toThrow(ApiError);
   });
 
   it("throws VALIDATION_ERROR with flattened details on failure", () => {
