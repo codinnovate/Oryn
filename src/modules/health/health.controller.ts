@@ -1,8 +1,10 @@
 import { Controller, Get } from "@nestjs/common";
 import { getEnv } from "@/lib/env";
+import { Public } from "@/modules/auth/decorators/auth.decorators";
 
 @Controller("health")
 export class HealthController {
+  @Public()
   @Get()
   getHealth() {
     let environment: string = "unknown";

@@ -30,6 +30,8 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 120_000,
     pool: "forks",
+    // Shared Postgres state requires strictly sequential file execution.
     singleFork: true,
+    fileParallelism: false,
   },
 });
