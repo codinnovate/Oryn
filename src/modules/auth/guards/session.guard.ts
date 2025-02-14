@@ -1,13 +1,13 @@
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
 import { Injectable } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
+import type { Reflector } from "@nestjs/core";
 import { getEnv } from "@/lib/env";
 import { ApiError } from "@/lib/http/api-error";
 import { toPublicUser } from "@/modules/auth/auth.service";
 import { IS_PUBLIC_KEY } from "@/modules/auth/decorators/auth.decorators";
 import type { AuthenticatedRequest } from "@/modules/auth/decorators/auth.decorators";
 import { SESSION_COOKIE_NAME } from "@/lib/http/cookies";
-import { SessionService } from "@/modules/auth/session.service";
+import type { SessionService } from "@/modules/auth/session.service";
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 

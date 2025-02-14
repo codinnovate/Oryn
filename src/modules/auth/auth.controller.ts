@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Post, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { getEnv } from "@/lib/env";
 import { buildClearedSessionCookie, buildSessionCookie, SESSION_COOKIE_NAME } from "@/lib/http/cookies";
 import { ZodValidationPipe } from "@/lib/http/zod-validation.pipe";
-import { AuthService } from "@/modules/auth/auth.service";
+import type { AuthService } from "@/modules/auth/auth.service";
 import {
   CurrentUser,
   Public,
