@@ -13,7 +13,7 @@ import {
   type RegisterDto,
   type ResetPasswordDto,
 } from "@/modules/auth/schemas";
-import type { SessionService} from "@/modules/auth/session.service";
+import { SessionService} from "@/modules/auth/session.service";
 import { type IssuedSession, type SessionMeta } from "@/modules/auth/session.service";
 
 const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000; // 24h

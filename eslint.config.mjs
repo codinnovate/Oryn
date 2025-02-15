@@ -11,10 +11,9 @@ export default defineConfig([
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { prefer: "type-imports" },
-      ],
+      // Incompatible with NestJS DI: constructor parameter types are needed
+      // at runtime for reflect-metadata, so they must stay value imports.
+      "@typescript-eslint/consistent-type-imports": "off",
       "no-console": ["error"],
     },
   },
