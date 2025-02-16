@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/database";
 import {
   sessions,
@@ -110,6 +110,45 @@ export class AuthRepository {
       .set({ revokedAt: new Date() })
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)))
       .then(() => undefined);
+  }
+
+  listActiveSessionsForUser(userId: string): Promise<Session[]> {
+    return this.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)))
+      .orderBy(desc(sessions.lastUsedAt));
+  }
+
+  /** Revokes one session only if it belongs to the given user; returns match. */
+  revokeSessionForUser(sessionId: string, userId: string): Promise<boolean> {
+    return this.db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(sessions.id, sessionId),
+          eq(sessions.userId, userId),
+          isNull(sessions.revokedAt),
+        ),
+      )
+      .returning({ id: sessions.id })
+      .then((rows) => rows.length > 0);
+  }
+
+  revokeAllForUserExcept(userId: string, keepSessionId: string): Promise<number> {
+    return this.db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(sessions.userId, userId),
+          isNull(sessions.revokedAt),
+          ne(sessions.id, keepSessionId),
+        ),
+      )
+      .returning({ id: sessions.id })
+      .then((rows) => rows.length);
   }
 
   insertVerificationToken(values: {

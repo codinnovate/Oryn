@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Res } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { getEnv } from "@/lib/env";
 import { buildClearedSessionCookie, buildSessionCookie, SESSION_COOKIE_NAME } from "@/lib/http/cookies";
@@ -22,6 +23,7 @@ import {
 } from "@/modules/auth/schemas";
 import type { SessionMeta } from "@/modules/auth/session.service";
 
+@ApiTags("auth")
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -39,6 +41,7 @@ export class AuthController {
 
   @Public()
   @Post("register")
+  @ApiOperation({ summary: "Create an account; returns session token and sets cookie" })
   async register(
     @Body(new ZodValidationPipe(registerSchema)) dto: RegisterDto,
     @Req() req: AuthenticatedRequest,
@@ -58,6 +61,7 @@ export class AuthController {
   @Public()
   @HttpCode(200)
   @Post("login")
+  @ApiOperation({ summary: "Exchange credentials for a session" })
   async login(
     @Body(new ZodValidationPipe(loginSchema)) dto: LoginDto,
     @Req() req: AuthenticatedRequest,
@@ -76,6 +80,7 @@ export class AuthController {
 
   @HttpCode(200)
   @Post("logout")
+  @ApiOperation({ summary: "Revoke the current session and clear the cookie" })
   async logout(
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
@@ -91,6 +96,7 @@ export class AuthController {
   @Public()
   @HttpCode(200)
   @Post("refresh")
+  @ApiOperation({ summary: "Rotate the current session token" })
   async refresh(
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
@@ -104,6 +110,7 @@ export class AuthController {
   }
 
   @Get("me")
+  @ApiOperation({ summary: "Get the authenticated user" })
   async me(@CurrentUser() user?: { id: string }) {
     const me = await this.authService.me(user!.id);
     return { data: me };
@@ -112,6 +119,7 @@ export class AuthController {
   @Public()
   @HttpCode(200)
   @Post("forgot-password")
+  @ApiOperation({ summary: "Request a password reset email (constant response)" })
   async forgotPassword(
     @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: { email: string },
   ) {
@@ -123,6 +131,7 @@ export class AuthController {
   @Public()
   @HttpCode(200)
   @Post("reset-password")
+  @ApiOperation({ summary: "Consume a reset token, set new password, revoke all sessions" })
   async resetPassword(
     @Body(new ZodValidationPipe(resetPasswordSchema)) dto: ResetPasswordDto,
   ) {
@@ -133,6 +142,7 @@ export class AuthController {
   @Public()
   @HttpCode(200)
   @Post("verify-email")
+  @ApiOperation({ summary: "Consume an email verification token (single-use)" })
   async verifyEmail(
     @Body(new ZodValidationPipe(verifyEmailSchema)) dto: { token: string },
   ) {
@@ -142,6 +152,7 @@ export class AuthController {
 
   @HttpCode(200)
   @Post("resend-verification")
+  @ApiOperation({ summary: "Resend the verification email for the current user" })
   async resendVerification(@CurrentUser() user?: { id: string }) {
     const result = await this.authService.resendVerification(user!.id);
     return { data: result };

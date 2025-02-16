@@ -24,8 +24,10 @@ export interface PublicUser {
   id: string;
   email: string;
   name: string | null;
+  avatarUrl: string | null;
   isEmailVerified: boolean;
   status: string;
+  preferences: Record<string, unknown> | null;
   createdAt: Date;
 }
 
@@ -34,8 +36,10 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     email: user.email,
     name: user.name,
+    avatarUrl: user.avatarUrl,
     isEmailVerified: user.isEmailVerified,
     status: user.status,
+    preferences: (user.preferences as Record<string, unknown>) ?? null,
     createdAt: user.createdAt,
   };
 }

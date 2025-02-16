@@ -66,4 +66,19 @@ export class SessionService {
   revokeAllForUser(userId: string): Promise<void> {
     return this.repo.revokeAllForUser(userId);
   }
+
+  /** Active (non-revoked) sessions for a user, most recently used first. */
+  listActive(userId: string): Promise<Session[]> {
+    return this.repo.listActiveSessionsForUser(userId);
+  }
+
+  /** Revokes one session scoped to its owner; false when missing/foreign. */
+  async revokeOwned(sessionId: string, userId: string): Promise<boolean> {
+    return this.repo.revokeSessionForUser(sessionId, userId);
+  }
+
+  /** Revokes every active session except `keepSessionId`; returns count. */
+  revokeAllExceptForUser(userId: string, keepSessionId: string): Promise<number> {
+    return this.repo.revokeAllForUserExcept(userId, keepSessionId);
+  }
 }
