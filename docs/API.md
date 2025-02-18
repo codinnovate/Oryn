@@ -79,6 +79,34 @@ Sessions expire after 30 days of issue; refresh rotates the token.
 | DELETE | `/auth/sessions/current/others` | Bearer/Cookie | Revoke every other session; keep the calling one. Returns `{ revoked: <count> }`. |
 | DELETE | `/auth/sessions/:sessionId` | Bearer/Cookie | Revoke a specific session owned by the caller. Foreign/unknown id → `404 RESOURCE_NOT_FOUND`. Revoking the calling session via this route is rejected (`{ revoked: false, self: true }`) — use `POST /auth/logout` instead so cookies are cleared. |
 
+## Workspaces
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/workspaces` | Bearer/Cookie | Create a workspace; caller becomes owner and a system role set (`owner`/`admin`/`member`/`viewer`) is seeded. Body: `{ name, slug? }`. Slug conflicts auto-suffix when derived from `name`; explicit invalid slug → `400`. |
+| GET | `/workspaces` | Bearer/Cookie | List own active memberships. Query: `page`, `limit`. Each item includes `roleKeys`. |
+| GET | `/workspaces/:workspaceId` | Member | Get one workspace. Non-members get `404 RESOURCE_NOT_FOUND` (existence is not leaked). |
+| PATCH | `/workspaces/:workspaceId` | Owner | Rename or replace settings. Body: `{ name?, settings? }`. Non-owners → `403 FORBIDDEN`. |
+| DELETE | `/workspaces/:workspaceId` | Owner | Soft-delete the workspace. |
+| GET | `/workspaces/:workspaceId/members` | Member | List members with `roleKeys`, `status`, `joinedAt`. |
+| PATCH | `/workspaces/:workspaceId/members/:memberId` | members:manage | Update member. Body: `{ status?: "active"\|"suspended", roleKey? }`. The owner cannot be modified or escalated to; `"owner"` role assignment is rejected until ownership transfer exists. |
+| DELETE | `/workspaces/:workspaceId/members/:memberId` | members:manage or self | Remove a member. Members may always remove themselves; admins may remove others; the owner can never be removed. |
+
+## Invitations
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/workspaces/:workspaceId/invitations` | members:invite | Invite by email. Body: `{ email, roleKey? }` (default `member`). Any prior pending invitation for the same email is superseded. Sends an email containing the accept URL. Inviting someone already a member → `409 RESOURCE_CONFLICT`. |
+| GET | `/invitations/:token` | Public | Preview an invitation: returns `{ workspaceName, expiresAt }` only — no emails, no tokens. Unknown/used/expired token → `404`. |
+| POST | `/invitations/:token/accept` | Bearer/Cookie | Accept. The authenticated account's email must match the invited address; otherwise `404` (same as unknown token). Tokens are single-use; membership becomes `active` and the invitation's role is assigned. |
+| DELETE | `/workspaces/:workspaceId/invitations/:invitationId` | members:invite | Revoke a pending invitation. |
+
+Permission model: system roles per workspace —
+`owner` (all permissions incl. workspace management), `admin` (everything except
+deletion/ownership), `member` (inbox day-to-day), `viewer` (read-only).
+Authorization failures use stable codes: non-members receive `RESOURCE_NOT_FOUND`,
+members lacking a permission receive `FORBIDDEN`.
+
 ---
 
 ## Planned modules

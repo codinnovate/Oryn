@@ -14,6 +14,6 @@ import { MAILER } from "@/lib/mailer/mailer.tokens";
     SessionGuard,
     { provide: MAILER, useClass: ConsoleMailer },
   ],
-  exports: [SessionService, AuthService],
+  exports: [SessionService, AuthService, MAILER],
 })
 export class AuthModule {}

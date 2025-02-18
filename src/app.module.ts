@@ -5,13 +5,14 @@ import { ConfigModule } from "@nestjs/config";
 import { HealthModule } from "@/modules/health/health.module";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { UsersModule } from "@/modules/users/users.module";
+import { WorkspacesModule } from "@/modules/workspaces/workspaces.module";
 import { AccessLogInterceptor } from "@/lib/http/access-log.interceptor";
 import { AllExceptionsFilter } from "@/lib/http/all-exceptions.filter";
 import { RequestIdMiddleware } from "@/lib/http/request-id.middleware";
 import { SessionGuard } from "@/modules/auth/guards/session.guard";
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), HealthModule, AuthModule, UsersModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), HealthModule, AuthModule, UsersModule, WorkspacesModule],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
