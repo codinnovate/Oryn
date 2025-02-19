@@ -101,6 +101,16 @@ Sessions expire after 30 days of issue; refresh rotates the token.
 | POST | `/invitations/:token/accept` | Bearer/Cookie | Accept. The authenticated account's email must match the invited address; otherwise `404` (same as unknown token). Tokens are single-use; membership becomes `active` and the invitation's role is assigned. |
 | DELETE | `/workspaces/:workspaceId/invitations/:invitationId` | members:invite | Revoke a pending invitation. |
 
+## Roles & Permissions
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/permissions` | Bearer/Cookie | Global permission catalogue (`emails:read`, `roles:manage`, ...). |
+| GET | `/workspaces/:workspaceId/roles` | Member | All workspace roles (system + custom) with `permissionKeys`. |
+| POST | `/workspaces/:workspaceId/roles` | roles:manage | Create a custom role. Body: `{ key, name, description?, permissionKeys[] }`. Reserved keys (`owner`/`admin`/`member`/`viewer`) → `400`; duplicates → `409`; unknown permission keys → `400 VALIDATION_ERROR`. |
+| PATCH | `/workspaces/:workspaceId/roles/:roleId` | roles:manage | Update name/description/permissionKeys. System roles are immutable (`403`); owner's permissions can never change. |
+| DELETE | `/workspaces/:workspaceId/roles/:roleId` | roles:manage | Delete an unassigned custom role. System roles → `403`; still-assigned roles → `409 RESOURCE_CONFLICT`. |
+
 Permission model: system roles per workspace —
 `owner` (all permissions incl. workspace management), `admin` (everything except
 deletion/ownership), `member` (inbox day-to-day), `viewer` (read-only).
