@@ -5,7 +5,7 @@ import { ZodValidationPipe } from "@/lib/http/zod-validation.pipe";
 import { z } from "zod";
 import { CurrentUser } from "@/modules/auth/decorators/auth.decorators";
 import { PermissionKeys } from "@/lib/db/schema";
-import { RbacService } from "@/modules/workspaces/rbac.service";
+import { RbacService } from "@/modules/rbac/rbac.service";
 import { RolesService } from "@/modules/workspaces/roles.service";
 
 const roleKeyFormat = z
@@ -74,7 +74,7 @@ export class RolesController {
       workspaceId,
       PermissionKeys.RolesManage,
     );
-    return { data: await this.rolesService.create(workspaceId, dto) };
+    return { data: await this.rolesService.create(user!.id, workspaceId, dto) };
   }
 
   @Patch("workspaces/:workspaceId/roles/:roleId")
@@ -91,7 +91,9 @@ export class RolesController {
       workspaceId,
       PermissionKeys.RolesManage,
     );
-    return { data: await this.rolesService.update(workspaceId, roleId, dto) };
+    return {
+      data: await this.rolesService.update(user!.id, workspaceId, roleId, dto),
+    };
   }
 
   @Delete("workspaces/:workspaceId/roles/:roleId")
@@ -106,7 +108,7 @@ export class RolesController {
       workspaceId,
       PermissionKeys.RolesManage,
     );
-    await this.rolesService.delete(workspaceId, roleId);
+    await this.rolesService.delete(user!.id, workspaceId, roleId);
     return { data: { deleted: true } };
   }
 }

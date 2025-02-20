@@ -117,6 +117,26 @@ deletion/ownership), `member` (inbox day-to-day), `viewer` (read-only).
 Authorization failures use stable codes: non-members receive `RESOURCE_NOT_FOUND`,
 members lacking a permission receive `FORBIDDEN`.
 
+## Audit logs
+
+Append-only trail of security-relevant actions. Entries are never updated or
+deleted by application code; recording is fire-and-forget so an audit outage
+never breaks the operation it observes.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/workspaces/:workspaceId/audit-logs` | audit_logs:read | Workspace trail, newest first. Query: `page`, `limit`, `action?` (prefix match on the dotted action namespace, e.g. `member.` or `role.`). |
+| GET | `/audit-logs` | Bearer/Cookie | The caller's own actions across all their workspaces. Query: `page`, `limit`. |
+
+Each entry: `{ id, action, actorUserId, targetType, targetId, metadata, createdAt }`.
+
+Recorded actions: `workspace.created`, `workspace.updated`, `workspace.deleted`,
+`member.invited`, `member.joined`, `member.updated`, `member.removed`,
+`invitation.revoked`, `role.created`, `role.updated`, `role.deleted`, plus
+account-level events (`user.registered`, `user.login`, `user.logout`,
+`user.password_reset_requested`, `user.password_reset_completed`,
+`user.password_changed`, `user.email_verified`, `user.account_deleted`).
+
 ---
 
 ## Planned modules

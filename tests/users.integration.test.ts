@@ -4,7 +4,9 @@ import { AuthService } from "@/modules/auth/auth.service";
 import { SessionService } from "@/modules/auth/session.service";
 import type { Mailer, MailInput } from "@/lib/mailer/mailer";
 import { UsersService } from "@/modules/users/users.service";
+import { AuditService } from "@/modules/audit/audit.service";
 import {
+  auditLogs,
   sessions,
   users,
   verificationTokens,
@@ -30,11 +32,11 @@ let usersService: UsersService;
 const meta = { userAgent: "vitest", ip: "127.0.0.1" };
 
 beforeEach(async () => {
-  await truncateTables([sessions, verificationTokens, users]);
+  await truncateTables([sessions, verificationTokens, users, auditLogs]);
   mailer = new FakeMailer();
   sessionService = new SessionService();
-  authService = new AuthService(mailer, sessionService);
-  usersService = new UsersService(sessionService);
+  authService = new AuthService(mailer, sessionService, new AuditService());
+  usersService = new UsersService(sessionService, new AuditService());
 });
 
 afterAll(async () => {

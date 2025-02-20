@@ -15,6 +15,8 @@ import {
 } from "@/modules/auth/schemas";
 import { SessionService} from "@/modules/auth/session.service";
 import { type IssuedSession, type SessionMeta } from "@/modules/auth/session.service";
+import type { AuditEntry } from "@/modules/audit/audit.service";
+import { AuditService } from "@/modules/audit/audit.service";
 
 const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30m
@@ -51,7 +53,21 @@ export class AuthService {
   constructor(
     @Inject(MAILER) private readonly mailer: Mailer,
     private readonly sessions: SessionService,
+    private readonly audit: AuditService,
   ) {}
+
+  /** Account-level events carry no workspace; meta is best-effort. */
+  private auditAuth(userId: string, action: string, meta?: SessionMeta, extra?: Record<string, unknown>): void {
+    const entry: AuditEntry = {
+      workspaceId: null,
+      actorUserId: userId,
+      action,
+      ip: meta?.ip ?? null,
+      userAgent: meta?.userAgent ?? null,
+      metadata: extra,
+    };
+    void this.audit.record(entry);
+  }
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<{ user: PublicUser; session: IssuedSession }> {
     const emailNormalized = normalizeEmail(dto.email);
@@ -71,6 +87,7 @@ export class AuthService {
 
     const session = await this.sessions.create(user.id, meta);
     user = (await this.repo.updateUser(user.id, { lastLoginAt: new Date() })) ?? user;
+    this.auditAuth(user.id, "user.registered", meta);
     return { user: toPublicUser(user), session };
   }
 
@@ -89,11 +106,15 @@ export class AuthService {
     }
     const session = await this.sessions.create(user.id, meta);
     await this.repo.updateUser(user.id, { lastLoginAt: new Date() });
+    this.auditAuth(user.id, "user.login", meta);
     return { user: toPublicUser(user), session };
   }
 
-  async logout(rawToken: string): Promise<void> {
+  async logout(rawToken: string, userId?: string, meta?: SessionMeta): Promise<void> {
     await this.sessions.revokeByRawToken(rawToken);
+    if (userId) {
+      this.auditAuth(userId, "user.logout", meta);
+    }
   }
 
   async refresh(rawToken: string, meta: SessionMeta): Promise<IssuedSession> {
@@ -131,6 +152,7 @@ export class AuthService {
         subject: "Reset your Oryn password",
         text: `Use this token to reset your password (valid 30 minutes): ${rawToken}`,
       });
+      this.auditAuth(user.id, "user.password_reset_requested");
     }
     return { accepted: true };
   }
@@ -152,6 +174,7 @@ export class AuthService {
     await this.repo.updateUser(record.userId, { passwordHash });
     // Password change invalidates every existing session.
     await this.sessions.revokeAllForUser(record.userId);
+    this.auditAuth(record.userId, "user.password_reset_completed");
   }
 
   async verifyEmail(rawToken: string): Promise<void> {
@@ -168,6 +191,7 @@ export class AuthService {
       throw ApiError.conflict("Verification token was already used");
     }
     await this.repo.updateUser(record.userId, { isEmailVerified: true });
+    this.auditAuth(record.userId, "user.email_verified");
   }
 
   async resendVerification(userId: string): Promise<{ sent: boolean }> {

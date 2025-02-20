@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import { AuthService } from "@/modules/auth/auth.service";
 import { SessionService } from "@/modules/auth/session.service";
 import type { Mailer, MailInput } from "@/lib/mailer/mailer";
+import { AuditService } from "@/modules/audit/audit.service";
 import {
+  auditLogs,
   sessions,
   users,
   verificationTokens,
@@ -31,9 +33,9 @@ let authService: AuthService;
 const meta = { userAgent: "vitest", ip: "127.0.0.1" };
 
 beforeEach(async () => {
-  await truncateTables([workspaceMembers, workspaces, sessions, verificationTokens, users]);
+  await truncateTables([workspaceMembers, workspaces, sessions, verificationTokens, users, auditLogs]);
   mailer = new FakeMailer();
-  authService = new AuthService(mailer, new SessionService());
+  authService = new AuthService(mailer, new SessionService(), new AuditService());
 });
 
 afterAll(async () => {

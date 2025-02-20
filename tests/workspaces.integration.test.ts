@@ -3,9 +3,11 @@ import { eq } from "drizzle-orm";
 import { AuthService } from "@/modules/auth/auth.service";
 import { SessionService } from "@/modules/auth/session.service";
 import type { Mailer, MailInput } from "@/lib/mailer/mailer";
-import { RbacService } from "@/modules/workspaces/rbac.service";
+import { AuditService } from "@/modules/audit/audit.service";
+import { RbacService } from "@/modules/rbac/rbac.service";
 import { WorkspacesService } from "@/modules/workspaces/workspaces.service";
 import {
+  auditLogs,
   invitations,
   memberRoles,
   permissions,
@@ -45,10 +47,12 @@ beforeEach(async () => {
     sessions,
     verificationTokens,
     users,
+    auditLogs,
   ]);
   mailer = new FakeMailer();
-  authService = new AuthService(mailer, new SessionService());
-  workspacesService = new WorkspacesService(new RbacService(), mailer);
+  const audit = new AuditService();
+  authService = new AuthService(mailer, new SessionService(), audit);
+  workspacesService = new WorkspacesService(new RbacService(), audit, mailer);
 });
 
 afterAll(async () => {

@@ -5,6 +5,8 @@ import { users, type User } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/crypto/passwords";
 import { ApiError } from "@/lib/http/api-error";
 import { SessionService } from "@/modules/auth/session.service";
+import type { AuditEntry } from "@/modules/audit/audit.service";
+import { AuditService } from "@/modules/audit/audit.service";
 
 /**
  * Profile, preferences and account lifecycle for the authenticated user.
@@ -15,7 +17,21 @@ import { SessionService } from "@/modules/auth/session.service";
 export class UsersService {
   private readonly db = getDb();
 
-  constructor(@Inject(SessionService) private readonly sessions: SessionService) {}
+  constructor(
+    @Inject(SessionService) private readonly sessions: SessionService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** Account-level events carry no workspace. */
+  private auditUser(userId: string, action: string, extra?: Record<string, unknown>): void {
+    const entry: AuditEntry = {
+      workspaceId: null,
+      actorUserId: userId,
+      action,
+      metadata: extra,
+    };
+    void this.audit.record(entry);
+  }
 
   async getProfile(userId: string): Promise<User> {
     return this.findActiveUser(userId);
@@ -64,6 +80,7 @@ export class UsersService {
     } else {
       await this.sessions.revokeAllForUser(userId);
     }
+    this.auditUser(userId, "user.password_changed");
   }
 
   /** Shallow merge at the top level of the preferences JSONB. */
@@ -121,6 +138,7 @@ export class UsersService {
       })
       .where(eq(users.id, userId));
     await this.sessions.revokeAllForUser(userId);
+    this.auditUser(userId, "user.account_deleted");
   }
 
   private async findActiveUser(userId: string): Promise<User> {

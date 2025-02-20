@@ -84,10 +84,11 @@ export class AuthController {
   async logout(
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user?: { id: string },
   ) {
     const token = bearerOrCookieToken(req);
     if (token) {
-      await this.authService.logout(token);
+      await this.authService.logout(token, user?.id, this.metaFrom(req));
     }
     res.setHeader("Set-Cookie", buildClearedSessionCookie(this.sessionCookieOptions()));
     return { data: { success: true } };

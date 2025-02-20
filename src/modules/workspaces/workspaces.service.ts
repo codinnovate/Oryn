@@ -7,7 +7,7 @@ import { randomToken, hashToken } from "@/lib/crypto/tokens";
 import { ApiError } from "@/lib/http/api-error";
 import { PermissionKeys } from "@/lib/db/schema";
 import type { Invitation, Workspace, WorkspaceMember } from "@/lib/db/schema";
-import { RbacService } from "@/modules/workspaces/rbac.service";
+import { RbacService } from "@/modules/rbac/rbac.service";
 import {
   slugify,
   type InviteMemberDto,
@@ -16,6 +16,8 @@ import {
   type UpdateWorkspaceDto,
 } from "@/modules/workspaces/schemas";
 import { WorkspaceRepository } from "@/modules/workspaces/workspace.repository";
+import type { AuditEntry } from "@/modules/audit/audit.service";
+import { AuditService } from "@/modules/audit/audit.service";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const SLUG_ATTEMPTS = 6;
@@ -30,8 +32,13 @@ export class WorkspacesService {
 
   constructor(
     private readonly rbac: RbacService,
+    private readonly audit: AuditService,
     @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
+
+  private auditWs(entry: AuditEntry): void {
+    void this.audit.record(entry);
+  }
 
   async create(
     userId: string,
@@ -49,6 +56,14 @@ export class WorkspacesService {
         name: dto.name,
         slug: candidate,
         ownerId: userId,
+      });
+      this.auditWs({
+        workspaceId: workspace.id,
+        actorUserId: userId,
+        action: "workspace.created",
+        targetType: "workspace",
+        targetId: workspace.id,
+        metadata: { name: workspace.name, slug: workspace.slug },
       });
       return workspace;
     }
@@ -76,6 +91,14 @@ export class WorkspacesService {
       ...(dto.settings ? { settings: dto.settings } : {}),
     });
     if (!updated) throw ApiError.notFound("Workspace not found");
+    this.auditWs({
+      workspaceId,
+      actorUserId: userId,
+      action: "workspace.updated",
+      targetType: "workspace",
+      targetId: workspaceId,
+      metadata: { name: dto.name ?? null, settingsChanged: !!dto.settings },
+    });
     return updated;
   }
 
@@ -85,6 +108,14 @@ export class WorkspacesService {
       throw ApiError.forbidden("Only the owner can delete a workspace");
     }
     await this.repo.softDelete(workspaceId);
+    this.auditWs({
+      workspaceId,
+      actorUserId: userId,
+      action: "workspace.deleted",
+      targetType: "workspace",
+      targetId: workspaceId,
+      metadata: { slug: workspace.slug },
+    });
   }
 
   async listMembers(
@@ -127,6 +158,14 @@ export class WorkspacesService {
     if (dto.roleKey) {
       await this.repo.assignRole(target.id, dto.roleKey, workspaceId);
     }
+    this.auditWs({
+      workspaceId,
+      actorUserId: actorId,
+      action: "member.updated",
+      targetType: "member",
+      targetId: targetMemberId,
+      metadata: { status: dto.status ?? null, roleKey: dto.roleKey ?? null },
+    });
   }
 
   async removeMember(
@@ -146,6 +185,14 @@ export class WorkspacesService {
       throw ApiError.forbidden("The workspace owner cannot be removed");
     }
     await this.repo.removeMember(target.id);
+    this.auditWs({
+      workspaceId,
+      actorUserId: actorId,
+      action: "member.removed",
+      targetType: "member",
+      targetId: targetMemberId,
+      metadata: { selfRemoval, removedUserId: target.userId },
+    });
   }
 
   async invite(
@@ -190,6 +237,14 @@ export class WorkspacesService {
       ].join("\n"),
     };
     await this.mailer.send(input);
+    this.auditWs({
+      workspaceId,
+      actorUserId: actorId,
+      action: "member.invited",
+      targetType: "invitation",
+      targetId: invitation.id,
+      metadata: { email: dto.email, roleKey: dto.roleKey ?? "member" },
+    });
     return { invitation };
   }
 
@@ -224,7 +279,16 @@ export class WorkspacesService {
       throw ApiError.notFound("Invitation not found");
     }
     try {
-      return await this.repo.acceptInvitation(invitation.id, userId, "member");
+      const member = await this.repo.acceptInvitation(invitation.id, userId, "member");
+      this.auditWs({
+        workspaceId: invitation.workspaceId,
+        actorUserId: userId,
+        action: "member.joined",
+        targetType: "member",
+        targetId: member.id,
+        metadata: { invitationId: invitation.id },
+      });
+      return member;
     } catch (err) {
       if (err instanceof Error && err.message === "invitation_not_acceptable") {
         throw ApiError.notFound("Invitation not found");
@@ -241,6 +305,13 @@ export class WorkspacesService {
     await this.rbac.requirePermission(actorId, workspaceId, PermissionKeys.MembersInvite);
     const ok = await this.repo.revokeInvitation(invitationId);
     if (!ok) throw ApiError.notFound("Pending invitation not found");
+    this.auditWs({
+      workspaceId,
+      actorUserId: actorId,
+      action: "invitation.revoked",
+      targetType: "invitation",
+      targetId: invitationId,
+    });
   }
 
   private async findLiveInvitation(token: string): Promise<Invitation> {

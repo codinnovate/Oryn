@@ -11,6 +11,8 @@ import {
 } from "@/lib/db/schema";
 import type { PermissionKey } from "@/lib/db/schema";
 import { ApiError } from "@/lib/http/api-error";
+import type { AuditEntry } from "@/modules/audit/audit.service";
+import { AuditService } from "@/modules/audit/audit.service";
 
 export interface RoleWithPermissions {
   id: string;
@@ -29,6 +31,12 @@ export interface RoleWithPermissions {
 @Injectable()
 export class RolesService {
   private readonly db = getDb();
+
+  constructor(private readonly audit: AuditService) {}
+
+  private auditRole(entry: AuditEntry): void {
+    void this.audit.record(entry);
+  }
 
   async list(workspaceId: string): Promise<RoleWithPermissions[]> {
     const rows = await this.db
@@ -55,6 +63,7 @@ export class RolesService {
   }
 
   async create(
+    actorUserId: string,
     workspaceId: string,
     dto: {
       key: string;
@@ -94,6 +103,14 @@ export class RolesService {
         .returning();
       if (!role) throw new Error("role_insert_failed");
       await this.replacePermissions(tx, role.id, dto.permissionKeys);
+      this.auditRole({
+        workspaceId,
+        actorUserId,
+        action: "role.created",
+        targetType: "role",
+        targetId: role.id,
+        metadata: { key: role.key, permissionKeys: [...dto.permissionKeys].sort() },
+      });
       return {
         id: role.id,
         key: role.key,
@@ -106,7 +123,8 @@ export class RolesService {
   }
 
   async update(
-    actorWorkspaceId: string,
+    actorUserId: string,
+    workspaceId: string,
     roleId: string,
     dto: {
       name?: string;
@@ -114,7 +132,7 @@ export class RolesService {
       permissionKeys?: string[];
     },
   ): Promise<RoleWithPermissions> {
-    const role = await this.findRole(actorWorkspaceId, roleId);
+    const role = await this.findRole(workspaceId, roleId);
     if (role.isSystem && (dto.name !== undefined || dto.permissionKeys !== undefined)) {
       // System roles may only have their description tweaked.
       if (dto.description === undefined) {
@@ -141,11 +159,22 @@ export class RolesService {
         await this.replacePermissions(tx, roleId, dto.permissionKeys);
       }
     });
+    this.auditRole({
+      workspaceId,
+      actorUserId,
+      action: "role.updated",
+      targetType: "role",
+      targetId: roleId,
+      metadata: {
+        name: dto.name ?? null,
+        permissionKeysChanged: !!dto.permissionKeys,
+      },
+    });
 
-    return this.get(actorWorkspaceId, roleId);
+    return this.get(workspaceId, roleId);
   }
 
-  async delete(workspaceId: string, roleId: string): Promise<void> {
+  async delete(actorUserId: string, workspaceId: string, roleId: string): Promise<void> {
     const role = await this.findRole(workspaceId, roleId);
     if (role.isSystem) {
       throw ApiError.forbidden("System roles cannot be deleted");
@@ -159,6 +188,14 @@ export class RolesService {
       throw ApiError.conflict("Role is still assigned to members");
     }
     await this.db.delete(roles).where(eq(roles.id, roleId));
+    this.auditRole({
+      workspaceId,
+      actorUserId,
+      action: "role.deleted",
+      targetType: "role",
+      targetId: roleId,
+      metadata: { key: role.key },
+    });
   }
 
   /** Global permission catalogue for UIs building role editors. */

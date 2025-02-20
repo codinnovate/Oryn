@@ -2,6 +2,7 @@ export * from "./_shared";
 export * from "./users.schema";
 export * from "./workspaces.schema";
 export * from "./rbac.schema";
+export * from "./audit.schema";
 
 /**
  * Canonical permission keys. The permissions table is seeded from this
