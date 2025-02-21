@@ -139,11 +139,32 @@ account-level events (`user.registered`, `user.login`, `user.logout`,
 
 ---
 
+## Email accounts
+
+Gmail/Outlook mailboxes connected to a workspace via OAuth (authorization-code
+flow). Provider access/refresh tokens are stored AES-256-GCM encrypted at rest
+and are never returned by the API. The signed OAuth state binds the consent
+round-trip to the initiating user and workspace; callbacks are public but
+reject invalid, expired (10 min), or cross-provider state with
+`400 OAUTH_STATE_INVALID`.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/workspaces/:workspaceId/email-accounts/oauth/:provider/start` | email_accounts:manage | Begin connecting `provider` (`gmail` \| `outlook`). Returns `{ authorizationUrl }` — redirect the browser there. Unconfigured provider → `503 PROVIDER_UNAVAILABLE`. |
+| GET | `/workspaces/:workspaceId/email-accounts/oauth/:provider/callback` | Public | OAuth redirect target. Validates `state`, exchanges `code`, stores encrypted tokens, upserts the account (re-consent updates in place). |
+| GET | `/workspaces/:workspaceId/email-accounts` | Member | List connected mailboxes. Each item: `{ id, provider, emailAddress, displayName, status, statusMessage, connectedByUserId, lastSyncedAt, createdAt }`. |
+| DELETE | `/workspaces/:workspaceId/email-accounts/:accountId` | email_accounts:manage | Disconnect and delete the account's stored tokens. Unknown id → `404`. |
+
+Connection lifecycle is audited as `email_account.connected` /
+`email_account.disconnected`. Expired access tokens are refreshed lazily on
+use; revoked grants surface as `OAUTH_TOKEN_EXPIRED`.
+
+---
+
 ## Planned modules
 
 The following domains are specified in the product plan and will be documented
-here as they land: workspaces & members & invitations, roles & permissions,
-audit log, OAuth provider connections (Gmail/Outlook), email accounts, sync,
-unified inbox, sending & scheduled emails, attachments, webhooks, rules engine,
+here as they land: sync, unified inbox, sending & scheduled emails,
+attachments, webhooks, rules engine,
 AI classification/summaries/auto-replies, semantic search, analytics,
 notifications, provider capabilities.

@@ -18,7 +18,7 @@ const LOG_FILE = path.resolve(process.cwd(), ".test-data/pg.log");
 process.env.NODE_ENV = process.env.NODE_ENV ?? "test";
 process.env.DATABASE_URL = process.env.DATABASE_URL ?? TEST_DATABASE_URL;
 process.env.ENCRYPTION_KEY =
-  process.env.ENCRYPTION_KEY ?? "dGVzdC1vbmx5LWVuY3J5cHRpb24ta2V5LTMyLWJ5dGVzIQ==";
+  process.env.ENCRYPTION_KEY ?? "b29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb28=";
 process.env.STATE_SECRET = process.env.STATE_SECRET ?? "test-state-secret-do-not-use";
 
 function findPgBin(name: string): string | null {
