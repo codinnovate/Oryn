@@ -11,10 +11,12 @@ import { EmailAccountsModule } from "@/modules/email-accounts/email-accounts.mod
 import { AccessLogInterceptor } from "@/lib/http/access-log.interceptor";
 import { AllExceptionsFilter } from "@/lib/http/all-exceptions.filter";
 import { RequestIdMiddleware } from "@/lib/http/request-id.middleware";
+import { RedisModule } from "@/lib/redis/redis.module";
+import { QueueModule } from "@/lib/queue/queue.module";
 import { SessionGuard } from "@/modules/auth/guards/session.guard";
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), HealthModule, AuthModule, UsersModule, WorkspacesModule, AuditModule, EmailAccountsModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, QueueModule, HealthModule, AuthModule, UsersModule, WorkspacesModule, AuditModule, EmailAccountsModule],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
