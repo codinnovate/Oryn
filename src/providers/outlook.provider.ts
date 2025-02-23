@@ -1,9 +1,12 @@
 import { getEnv } from "@/lib/env";
 import { getJson, parseTokenResponse, postTokenForm } from "@/providers/http";
+import { toProviderMessage } from "@/providers/address";
 import {
   ProviderError,
   type AuthorizationUrlInput,
   type EmailProviderAdapter,
+  type ListMessagesOptions,
+  type ListMessagesResult,
   type OAuthTokens,
   type ProviderProfile,
 } from "@/providers/types";
@@ -90,6 +93,67 @@ export class OutlookProvider implements EmailProviderAdapter {
       emailAddress: email,
       displayName: typeof me.displayName === "string" ? me.displayName : null,
     };
+  }
+
+  /**
+   * Lists inbox message metadata newest-first via Microsoft Graph. A single
+   * Graph page maps 1:1 onto ProviderMessage entries.
+   */
+  async listMessages(
+    accessToken: string,
+    options: ListMessagesOptions = {},
+  ): Promise<ListMessagesResult> {
+    const maxResults = Math.min(Math.max(options.maxResults ?? 25, 1), 50);
+    const params = new URLSearchParams({
+      "$top": String(maxResults),
+      "$select":
+        "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,isRead,hasAttachments",
+    });
+    if (options.pageToken) params.set("$skiptoken", options.pageToken);
+    if (options.since) {
+      // receivedDateTime is a Graph filterable Edm.DateTimeOffset property.
+      params.set(
+        "$filter",
+        `receivedDateTime ge ${options.since.toISOString()}`,
+      );
+    }
+
+    const page = await getJson(`${GRAPH_ME}/messages?${params}`, accessToken, "Graph messages");
+    const rows = Array.isArray(page.value) ? page.value : [];
+
+    let nextPageToken: string | null = null;
+    const nextLink = typeof page["@odata.nextLink"] === "string" ? page["@odata.nextLink"] : null;
+    if (nextLink) {
+      try {
+        nextPageToken = new URL(nextLink).searchParams.get("$skiptoken");
+      } catch {
+        nextPageToken = null;
+      }
+    }
+
+    const messages = rows
+      .map((row: Record<string, unknown>) =>
+        toProviderMessage({
+          providerMessageId: row.id,
+          threadId: row.conversationId,
+          subject: row.subject,
+          from: (row.from as { emailAddress?: { address?: unknown } } | undefined)?.emailAddress
+            ?.address,
+          to: Array.isArray(row.toRecipients)
+            ? (row.toRecipients as Array<{ emailAddress?: { address?: unknown } }>)
+                .map((r) => r?.emailAddress?.address)
+                .join(",")
+            : undefined,
+          snippet: row.bodyPreview,
+          receivedAt: typeof row.receivedDateTime === "string" ? row.receivedDateTime : undefined,
+          isRead: row.isRead === true,
+          hasAttachments: row.hasAttachments === true,
+          labels: [],
+        }),
+      )
+      .filter((m): m is NonNullable<typeof m> => m !== null);
+
+    return { messages, nextPageToken };
   }
 }
 

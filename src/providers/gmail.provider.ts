@@ -1,9 +1,12 @@
 import { getEnv } from "@/lib/env";
 import { getJson, parseTokenResponse, postTokenForm } from "@/providers/http";
+import { toProviderMessage } from "@/providers/address";
 import {
   ProviderError,
   type AuthorizationUrlInput,
   type EmailProviderAdapter,
+  type ListMessagesOptions,
+  type ListMessagesResult,
   type OAuthTokens,
   type ProviderProfile,
 } from "@/providers/types";
@@ -11,6 +14,7 @@ import {
 const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
+const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 /** Full mailbox access is required for sync + sending. */
 const SCOPES = ["https://mail.google.com/", "openid", "email", "profile"];
@@ -75,6 +79,84 @@ export class GmailProvider implements EmailProviderAdapter {
       emailAddress: email,
       displayName: typeof info.name === "string" ? info.name : null,
     };
+  }
+
+  /**
+   * Lists message metadata newest-first. Gmail's list endpoint returns ids
+   * only, so each page is hydrated with per-message metadata requests,
+   * bounded by maxResults to respect provider rate limits.
+   */
+  async listMessages(
+    accessToken: string,
+    options: ListMessagesOptions = {},
+  ): Promise<ListMessagesResult> {
+    const maxResults = Math.min(Math.max(options.maxResults ?? 25, 1), 100);
+    const params = new URLSearchParams({ maxResults: String(maxResults) });
+    if (options.pageToken) params.set("pageToken", options.pageToken);
+    if (options.since) {
+      params.set("q", `after:${Math.floor(options.since.getTime() / 1000)}`);
+    }
+
+    const list = await getJson(
+      `${GMAIL_API}/messages?${params.toString()}`,
+      accessToken,
+      "Gmail messages list",
+    );
+    const refs = Array.isArray(list.messages) ? list.messages : [];
+    const nextPageToken =
+      typeof list.nextPageToken === "string" && list.nextPageToken
+        ? list.nextPageToken
+        : null;
+
+    const messages = (
+      await Promise.all(
+        refs.map((ref) => this.fetchMetadata(accessToken, ref)),
+      )
+    ).filter((m): m is NonNullable<typeof m> => m !== null);
+    return { messages, nextPageToken };
+  }
+
+  /** Fetches one message's metadata; unmappable payloads are skipped. */
+  private async fetchMetadata(
+    accessToken: string,
+    ref: unknown,
+  ): Promise<ReturnType<typeof toProviderMessage>> {
+    const id = typeof (ref as { id?: unknown })?.id === "string" ? (ref as { id: string }).id : "";
+    if (!id) return null;
+    try {
+      const msg = await getJson(
+        `${GMAIL_API}/messages/${encodeURIComponent(id)}?format=metadata`,
+        accessToken,
+        "Gmail message",
+      );
+      const payload = (msg.payload ?? {}) as {
+        headers?: Array<{ name?: unknown; value?: unknown }>;
+      };
+      const header = (name: string): string | null => {
+        const hit = (payload.headers ?? []).find(
+          (h) => typeof h.name === "string" && h.name.toLowerCase() === name.toLowerCase(),
+        );
+        return typeof hit?.value === "string" ? hit.value : null;
+      };
+      const labelIds = Array.isArray(msg.labelIds) ? msg.labelIds : [];
+      return toProviderMessage({
+        providerMessageId: msg.id,
+        threadId: msg.threadId,
+        subject: header("Subject"),
+        from: header("From"),
+        to: header("To"),
+        snippet: msg.snippet,
+        receivedAt: typeof msg.internalDate === "string" ? Number(msg.internalDate) : undefined,
+        isRead: !labelIds.includes("UNREAD"),
+        // Attachment detection needs the full payload; refined by the inbox module.
+        hasAttachments: false,
+        sizeBytes: typeof msg.sizeEstimate === "number" ? msg.sizeEstimate : undefined,
+        labels: labelIds,
+      });
+    } catch (_err) {
+      // Provider errors (404, 429, network) — skip this message, continue sync.
+      return null;
+    }
   }
 }
 

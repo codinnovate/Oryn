@@ -21,6 +21,35 @@ export interface AuthorizationUrlInput {
   redirectUri: string;
 }
 
+/** Metadata snapshot of a provider mailbox message (no body content). */
+export interface ProviderMessage {
+  providerMessageId: string;
+  threadId: string | null;
+  subject: string | null;
+  /** Normalized lowercase sender address. */
+  fromAddress: string | null;
+  /** Normalized lowercase recipient addresses. */
+  toAddresses: string[];
+  snippet: string | null;
+  receivedAt: Date | null;
+  isRead: boolean;
+  hasAttachments: boolean;
+  sizeBytes: number | null;
+  labels: string[];
+}
+
+export interface ListMessagesOptions {
+  maxResults?: number;
+  pageToken?: string | null;
+  /** Restrict results to messages received at/after this time. */
+  since?: Date | null;
+}
+
+export interface ListMessagesResult {
+  messages: ProviderMessage[];
+  nextPageToken: string | null;
+}
+
 /**
  * Adapter contract for provider OAuth connections. HTTP-layer code never
  * talks to Google/Microsoft directly — only to this interface.
@@ -34,6 +63,14 @@ export interface EmailProviderAdapter {
   exchangeCode(code: string, redirectUri: string): Promise<OAuthTokens>;
   refresh(refreshToken: string): Promise<OAuthTokens>;
   getProfile(accessToken: string): Promise<ProviderProfile>;
+  /**
+   * Lists message metadata ordered newest-first. Bodies are fetched lazily
+   * by the inbox module — sync only stores metadata + snippet.
+   */
+  listMessages(
+    accessToken: string,
+    options?: ListMessagesOptions,
+  ): Promise<ListMessagesResult>;
 }
 
 /** Error thrown by adapters on protocol/HTTP failures. */

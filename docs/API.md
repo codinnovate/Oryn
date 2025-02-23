@@ -161,10 +161,27 @@ use; revoked grants surface as `OAUTH_TOKEN_EXPIRED`.
 
 ---
 
+## Sync
+
+Incremental mailbox synchronization fetches message metadata (headers,
+snippet, flags) from the provider and upserts it into the `email_messages`
+store. Full bodies are fetched lazily by the unified inbox module. Sync runs
+asynchronously via BullMQ — the API returns a job identifier immediately.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/workspaces/:workspaceId/email-accounts/:accountId/sync` | emails:read | Enqueue a mailbox sync job → `202 { data: { jobId } }`. The account must be active; revoked accounts return `409 EMAIL_ACCOUNT_NOT_CONNECTED`. |
+
+Each sync run processes up to 10 provider pages (50 messages/page). Providers
+rate-limited or temporarily unreachable cause BullMQ retries with exponential
+backoff. Revoked grants mark the account as `revoked` and are not retried.
+
+---
+
 ## Planned modules
 
 The following domains are specified in the product plan and will be documented
-here as they land: sync, unified inbox, sending & scheduled emails,
+here as they land: unified inbox, sending & scheduled emails,
 attachments, webhooks, rules engine,
 AI classification/summaries/auto-replies, semantic search, analytics,
 notifications, provider capabilities.

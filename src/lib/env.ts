@@ -35,6 +35,7 @@ const envSchema = z.object({
   EMAIL_BODY_MAX_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024),
 
   DISABLE_WEBHOOK_SIGNATURE_CHECKS: boolish.default(false),
+  DISABLE_SYNC_WORKER: boolish.default(false),
 });
 
 export type Env = z.infer<typeof envSchema>;

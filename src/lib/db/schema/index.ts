@@ -4,6 +4,7 @@ export * from "./workspaces.schema";
 export * from "./rbac.schema";
 export * from "./audit.schema";
 export * from "./emailAccounts.schema";
+export * from "./emails.schema";
 
 /**
  * Canonical permission keys. The permissions table is seeded from this
