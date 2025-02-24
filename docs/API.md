@@ -178,10 +178,27 @@ backoff. Revoked grants mark the account as `revoked` and are not retried.
 
 ---
 
+## Inbox
+
+Paginated, filterable access to synced message metadata. Full bodies are
+fetched lazily by a future body-fetch endpoint — the inbox only returns the
+metadata + snippet stored by sync. Messages belong to a workspace; tenancy
+is enforced on every request.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/workspaces/:workspaceId/messages` | emails:read | Paginated message list. Filters: `emailAccountId`, `isRead`, `direction` (`inbound`/`outbound`), `q` (subject search), `receivedAfter`, `receivedBefore`. Sort: `-receivedAt` (default, newest first) or `receivedAt`. |
+| GET | `/workspaces/:workspaceId/messages/:messageId` | emails:read | Single message detail. Unknown id or cross-workspace → `404`. |
+| PATCH | `/workspaces/:workspaceId/messages/:messageId` | emails:write | Patch mutable flags: `isRead` (boolean), `labels` (string array). At least one field required. Returns the updated message. |
+
+All collection responses follow the standard `{ data, pagination }` envelope.
+
+---
+
 ## Planned modules
 
 The following domains are specified in the product plan and will be documented
-here as they land: unified inbox, sending & scheduled emails,
+here as they land: sending & scheduled emails,
 attachments, webhooks, rules engine,
 AI classification/summaries/auto-replies, semantic search, analytics,
 notifications, provider capabilities.

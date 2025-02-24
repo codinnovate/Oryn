@@ -153,7 +153,7 @@ export class GmailProvider implements EmailProviderAdapter {
         sizeBytes: typeof msg.sizeEstimate === "number" ? msg.sizeEstimate : undefined,
         labels: labelIds,
       });
-    } catch (_err) {
+    } catch {
       // Provider errors (404, 429, network) — skip this message, continue sync.
       return null;
     }
