@@ -43,6 +43,7 @@ function fakeAdapter(): EmailProviderAdapter {
       displayName: "Inbox Test",
     }),
     listMessages: async () => ({ messages: [], nextPageToken: null }),
+    sendMessage: async () => ({ providerMessageId: "" }),
   };
 }
 

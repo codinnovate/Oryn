@@ -7,6 +7,8 @@ import { getLogger } from "@/lib/logger";
 export const QUEUE_NAMES = {
   /** Incremental provider mailbox syncs triggered by API or schedules. */
   emailSync: "email-sync",
+  /** Outbound emails (immediate or scheduled). */
+  emailSend: "email-send",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

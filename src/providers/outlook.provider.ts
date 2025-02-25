@@ -9,6 +9,8 @@ import {
   type ListMessagesResult,
   type OAuthTokens,
   type ProviderProfile,
+  type SendMessageInput,
+  type SendResult,
 } from "@/providers/types";
 
 const GRAPH_ME = "https://graph.microsoft.com/v1.0/me";
@@ -154,6 +156,57 @@ export class OutlookProvider implements EmailProviderAdapter {
       .filter((m): m is NonNullable<typeof m> => m !== null);
 
     return { messages, nextPageToken };
+  }
+
+  async sendMessage(
+    accessToken: string,
+    input: SendMessageInput,
+  ): Promise<SendResult> {
+    const toRecipients = input.to.map((addr) => ({ emailAddress: { address: addr } }));
+    const ccRecipients = input.cc?.map((addr) => ({ emailAddress: { address: addr } })) ?? [];
+    const bccRecipients = input.bcc?.map((addr) => ({ emailAddress: { address: addr } })) ?? [];
+
+    const bodyContent = input.html
+      ? { contentType: "HTML", content: input.html }
+      : { contentType: "Text", content: input.text ?? "" };
+
+    const mail = {
+      subject: input.subject,
+      body: bodyContent,
+      toRecipients,
+      ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
+      bccRecipients: bccRecipients.length > 0 ? bccRecipients : undefined,
+    };
+
+    let res: Response;
+    try {
+      res = await fetch(`${GRAPH_ME}/sendMail`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ message: mail }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new ProviderError("Graph sendMail endpoint unreachable", "unavailable");
+    }
+
+    // Graph returns 202 Accepted on success (no body).
+    if (res.status === 202) {
+      // Graph doesn't return a message id from sendMail — we return a placeholder.
+      // The caller can use the scheduledEmails id as the local reference.
+      return { providerMessageId: "" };
+    }
+
+    if (res.status === 401) {
+      throw new ProviderError("Access token rejected", "invalid_grant", res.status);
+    }
+    if (res.status === 429) {
+      throw new ProviderError("Provider rate limited", "rate_limited", res.status);
+    }
+    throw new ProviderError(`Graph sendMail failed (${res.status})`, "unavailable", res.status);
   }
 }
 

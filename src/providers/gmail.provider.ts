@@ -9,6 +9,8 @@ import {
   type ListMessagesResult,
   type OAuthTokens,
   type ProviderProfile,
+  type SendMessageInput,
+  type SendResult,
 } from "@/providers/types";
 
 const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -157,6 +159,57 @@ export class GmailProvider implements EmailProviderAdapter {
       // Provider errors (404, 429, network) — skip this message, continue sync.
       return null;
     }
+  }
+
+  async sendMessage(
+    accessToken: string,
+    input: SendMessageInput,
+  ): Promise<SendResult> {
+    const { buildRfc2822Message } = await import("@/providers/rfc2822");
+    // Gmail requires the "From" header but the API fills the real sender;
+    // we use a placeholder — Gmail overwrites it with the authenticated account.
+    const raw = buildRfc2822Message(input, input.to[0] ?? "");
+    const body = Buffer.from(raw).toString("base64url");
+
+    let res: Response;
+    try {
+      res = await fetch(`${GMAIL_API}/messages/send`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ raw }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new ProviderError("Gmail send endpoint unreachable", "unavailable");
+    }
+
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new ProviderError("Access token rejected", "invalid_grant", res.status);
+      }
+      if (res.status === 429) {
+        throw new ProviderError("Provider rate limited", "rate_limited", res.status);
+      }
+      throw new ProviderError(`Gmail send failed (${res.status})`, "unavailable", res.status);
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new ProviderError("Malformed Gmail send response", "invalid_response", res.status);
+    }
+
+    const id = typeof payload.id === "string" ? payload.id : "";
+    if (!id) {
+      throw new ProviderError("Gmail send response missing message id", "invalid_response");
+    }
+    void body; // base64url encoded raw is not needed in the result
+    return { providerMessageId: id };
   }
 }
 

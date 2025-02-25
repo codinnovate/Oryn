@@ -43,6 +43,7 @@ function fakeAdapter(id: "gmail" | "outlook"): EmailProviderAdapter {
       messages: [],
       nextPageToken: null,
     }),
+    sendMessage: async () => ({ providerMessageId: "" }),
   };
 }
 

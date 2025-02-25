@@ -195,10 +195,32 @@ All collection responses follow the standard `{ data, pagination }` envelope.
 
 ---
 
+## Messaging (send & schedule)
+
+Send emails immediately or schedule them for future delivery. Emails are routed
+through the provider adapter (Gmail API / Microsoft Graph) via a background
+BullMQ worker. The API returns the local scheduled email id and job id
+immediately (HTTP 202 Accepted). Each request is scoped to one connected email
+account; cross-workspace or inactive accounts return `404` / `409`.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/workspaces/:workspaceId/email-accounts/:accountId/messages/send` | emails:send | Send an email immediately. Body: `to` (string or string[]), optional `cc`, `bcc`, `subject`, `text`, `html` (at least one body required). Returns `202 { data: { id, jobId } }`. |
+| POST | `/workspaces/:workspaceId/email-accounts/:accountId/messages/schedule` | emails:send | Schedule a future send. Same body as `/send` plus `scheduledFor` (ISO 8601 date, must be in the future). BullMQ delays the job until the scheduled time. Returns `202 { data: { id, jobId } }`. |
+| DELETE | `/workspaces/:workspaceId/email-accounts/:accountId/messages/:messageId` | emails:send | Cancel a pending scheduled email. Already-sent emails → `404`. |
+| GET | `/workspaces/:workspaceId/email-accounts/:accountId/messages/scheduled` | emails:read | List pending scheduled emails for the account, ordered by `scheduledFor`. Returns `{ data: [...] }`. |
+
+### Outbound direction (future)
+
+When the unified inbox module learns about outbound messages (via provider
+sync or the send pipeline), the `direction: "outbound"` filter on the inbox
+list endpoint will surface them alongside inbound messages.
+
+---
+
 ## Planned modules
 
 The following domains are specified in the product plan and will be documented
-here as they land: sending & scheduled emails,
-attachments, webhooks, rules engine,
+here as they land: attachments, webhooks, rules engine,
 AI classification/summaries/auto-replies, semantic search, analytics,
 notifications, provider capabilities.

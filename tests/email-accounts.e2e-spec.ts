@@ -43,6 +43,8 @@ function fakeAdapter(id: "gmail" | "outlook", configured = true): EmailProviderA
       emailAddress: "mailbox@example.com",
       displayName: "Example Mailbox",
     }),
+    listMessages: async () => ({ messages: [], nextPageToken: null }),
+    sendMessage: async () => ({ providerMessageId: "" }),
   };
 }
 

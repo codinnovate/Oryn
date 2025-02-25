@@ -10,6 +10,7 @@ import { AuditModule } from "@/modules/audit/audit.module";
 import { EmailAccountsModule } from "@/modules/email-accounts/email-accounts.module";
 import { SyncModule } from "@/modules/sync/sync.module";
 import { InboxModule } from "@/modules/inbox/inbox.module";
+import { MessagingModule } from "@/modules/messaging/messaging.module";
 import { AccessLogInterceptor } from "@/lib/http/access-log.interceptor";
 import { AllExceptionsFilter } from "@/lib/http/all-exceptions.filter";
 import { RequestIdMiddleware } from "@/lib/http/request-id.middleware";
@@ -18,7 +19,7 @@ import { QueueModule } from "@/lib/queue/queue.module";
 import { SessionGuard } from "@/modules/auth/guards/session.guard";
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, QueueModule, HealthModule, AuthModule, UsersModule, WorkspacesModule, AuditModule, EmailAccountsModule, SyncModule, InboxModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true }), RedisModule, QueueModule, HealthModule, AuthModule, UsersModule, WorkspacesModule, AuditModule, EmailAccountsModule, SyncModule, InboxModule, MessagingModule],
   controllers: [],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

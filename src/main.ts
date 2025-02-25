@@ -6,7 +6,9 @@ import { AppModule } from "@/app.module";
 import { getEnv } from "@/lib/env";
 import { PinoLoggerService } from "@/lib/logger";
 import { SyncService } from "@/modules/sync/sync.service";
+import { MessagingService } from "@/modules/messaging/messaging.service";
 import { startEmailSyncWorker } from "@/jobs/email-sync.processor";
+import { startEmailSendWorker } from "@/jobs/email-send.processor";
 
 async function bootstrap(): Promise<void> {
   const env = getEnv();
@@ -36,10 +38,15 @@ async function bootstrap(): Promise<void> {
   // Start background workers unless disabled (tests, or dedicated worker process).
   if (!env.DISABLE_SYNC_WORKER) {
     const syncService = app.get(SyncService);
-    const worker = startEmailSyncWorker((id) => syncService.runAccountSync(id));
-    const closeWorker = () => worker.close().catch(() => undefined);
-    process.on("SIGTERM", closeWorker);
-    process.on("SIGINT", closeWorker);
+    const syncWorker = startEmailSyncWorker((id) => syncService.runAccountSync(id));
+    const messagingService = app.get(MessagingService);
+    const sendWorker = startEmailSendWorker((id) => messagingService.runSend(id));
+    const closeWorkers = () => {
+      syncWorker.close().catch(() => undefined);
+      sendWorker.close().catch(() => undefined);
+    };
+    process.on("SIGTERM", closeWorkers);
+    process.on("SIGINT", closeWorkers);
   }
 }
 

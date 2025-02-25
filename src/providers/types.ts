@@ -50,6 +50,22 @@ export interface ListMessagesResult {
   nextPageToken: string | null;
 }
 
+/** Payload for sending a single email through a provider. */
+export interface SendMessageInput {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  /** Plain text body. */
+  text?: string;
+  /** HTML body. */
+  html?: string;
+}
+
+export interface SendResult {
+  providerMessageId: string;
+}
+
 /**
  * Adapter contract for provider OAuth connections. HTTP-layer code never
  * talks to Google/Microsoft directly — only to this interface.
@@ -71,6 +87,15 @@ export interface EmailProviderAdapter {
     accessToken: string,
     options?: ListMessagesOptions,
   ): Promise<ListMessagesResult>;
+  /**
+   * Sends a single outbound email. The adapter builds the provider-native
+   * payload (RFC 2822 for Gmail, Graph JSON for Outlook) and returns the
+   * provider-assigned message id.
+   */
+  sendMessage(
+    accessToken: string,
+    input: SendMessageInput,
+  ): Promise<SendResult>;
 }
 
 /** Error thrown by adapters on protocol/HTTP failures. */

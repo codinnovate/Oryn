@@ -71,6 +71,7 @@ function fakeGmailAdapter(): EmailProviderAdapter {
         nextPageToken: null,
       };
     },
+    sendMessage: async () => ({ providerMessageId: "" }),
   };
 }
 
@@ -229,6 +230,7 @@ describe("SyncService.runAccountSync (integration)", () => {
         ],
         nextPageToken: null,
       }),
+      sendMessage: async () => ({ providerMessageId: "" }),
     };
 
     const SyncService = (await import("@/modules/sync/sync.service")).SyncService;
