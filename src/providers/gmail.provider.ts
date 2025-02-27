@@ -2,12 +2,20 @@ import { getEnv } from "@/lib/env";
 import { getJson, parseTokenResponse, postTokenForm } from "@/providers/http";
 import { toProviderMessage } from "@/providers/address";
 import {
+  collectAttachments,
+  extractBody,
+  hasAnyAttachment,
+  type GmailMimePart,
+} from "@/providers/gmail.mime";
+import {
   ProviderError,
   type AuthorizationUrlInput,
   type EmailProviderAdapter,
   type ListMessagesOptions,
   type ListMessagesResult,
   type OAuthTokens,
+  type ProviderAttachmentMeta,
+  type ProviderMessageBody,
   type ProviderProfile,
   type SendMessageInput,
   type SendResult,
@@ -131,9 +139,7 @@ export class GmailProvider implements EmailProviderAdapter {
         accessToken,
         "Gmail message",
       );
-      const payload = (msg.payload ?? {}) as {
-        headers?: Array<{ name?: unknown; value?: unknown }>;
-      };
+      const payload = (msg.payload ?? {}) as GmailMimePart;
       const header = (name: string): string | null => {
         const hit = (payload.headers ?? []).find(
           (h) => typeof h.name === "string" && h.name.toLowerCase() === name.toLowerCase(),
@@ -150,13 +156,11 @@ export class GmailProvider implements EmailProviderAdapter {
         snippet: msg.snippet,
         receivedAt: typeof msg.internalDate === "string" ? Number(msg.internalDate) : undefined,
         isRead: !labelIds.includes("UNREAD"),
-        // Attachment detection needs the full payload; refined by the inbox module.
-        hasAttachments: false,
+        hasAttachments: hasAnyAttachment(payload),
         sizeBytes: typeof msg.sizeEstimate === "number" ? msg.sizeEstimate : undefined,
         labels: labelIds,
       });
     } catch {
-      // Provider errors (404, 429, network) — skip this message, continue sync.
       return null;
     }
   }
@@ -210,6 +214,66 @@ export class GmailProvider implements EmailProviderAdapter {
     }
     void body; // base64url encoded raw is not needed in the result
     return { providerMessageId: id };
+  }
+
+  async fetchMessageBody(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderMessageBody> {
+    const msg = await getJson(
+      `${GMAIL_API}/messages/${encodeURIComponent(providerMessageId)}?format=full`,
+      accessToken,
+      "Gmail message body",
+    );
+    const payload = (msg.payload ?? {}) as GmailMimePart;
+    const text = extractBody(payload, "text/plain");
+    const html = extractBody(payload, "text/html");
+    return { text: text || undefined, html: html || undefined };
+  }
+
+  async listAttachments(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderAttachmentMeta[]> {
+    const msg = await getJson(
+      `${GMAIL_API}/messages/${encodeURIComponent(providerMessageId)}?format=full`,
+      accessToken,
+      "Gmail message for attachments",
+    );
+    const payload = (msg.payload ?? {}) as GmailMimePart;
+    return collectAttachments(payload);
+  }
+
+  async getAttachment(
+    accessToken: string,
+    providerMessageId: string,
+    providerAttachmentId: string,
+  ): Promise<Buffer> {
+    let res: Response;
+    try {
+      res = await fetch(
+        `${GMAIL_API}/messages/${encodeURIComponent(providerMessageId)}/attachments/${encodeURIComponent(providerAttachmentId)}`,
+        {
+          headers: { authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+    } catch {
+      throw new ProviderError("Gmail attachment endpoint unreachable", "unavailable");
+    }
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new ProviderError("Attachment not found", "not_found", 404);
+      }
+      throw new ProviderError(`Gmail attachment fetch failed (${res.status})`, "unavailable", res.status);
+    }
+
+    const data = await res.json() as { data?: string };
+    if (typeof data.data !== "string") {
+      throw new ProviderError("Gmail attachment response missing data field", "invalid_response");
+    }
+    return Buffer.from(data.data, "base64url");
   }
 }
 

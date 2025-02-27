@@ -8,6 +8,8 @@ import {
   type ListMessagesOptions,
   type ListMessagesResult,
   type OAuthTokens,
+  type ProviderAttachmentMeta,
+  type ProviderMessageBody,
   type ProviderProfile,
   type SendMessageInput,
   type SendResult,
@@ -207,6 +209,75 @@ export class OutlookProvider implements EmailProviderAdapter {
       throw new ProviderError("Provider rate limited", "rate_limited", res.status);
     }
     throw new ProviderError(`Graph sendMail failed (${res.status})`, "unavailable", res.status);
+  }
+
+  async fetchMessageBody(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderMessageBody> {
+    const msg = await getJson(
+      `${GRAPH_ME}/messages/${encodeURIComponent(providerMessageId)}?$select=body`,
+      accessToken,
+      "Graph message body",
+    );
+    const body = msg.body as { contentType?: string; content?: string } | undefined;
+    if (!body?.content) return {};
+    if (body.contentType === "html") {
+      return { html: body.content };
+    }
+    return { text: body.content };
+  }
+
+  async listAttachments(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderAttachmentMeta[]> {
+    const page = await getJson(
+      `${GRAPH_ME}/messages/${encodeURIComponent(providerMessageId)}/attachments?$select=id,name,contentType,size`,
+      accessToken,
+      "Graph attachments",
+    );
+    const rows = Array.isArray(page.value) ? page.value : [];
+    return rows
+      .filter(
+        (a: Record<string, unknown>) =>
+          typeof a.id === "string" && typeof a.name === "string",
+      )
+      .map((a: Record<string, unknown>) => ({
+        providerAttachmentId: a.id as string,
+        filename: a.name as string,
+        mimeType: typeof a.contentType === "string" ? a.contentType : "application/octet-stream",
+        sizeBytes: typeof a.size === "number" ? a.size : 0,
+      }));
+  }
+
+  async getAttachment(
+    accessToken: string,
+    providerMessageId: string,
+    providerAttachmentId: string,
+  ): Promise<Buffer> {
+    let res: Response;
+    try {
+      res = await fetch(
+        `${GRAPH_ME}/messages/${encodeURIComponent(providerMessageId)}/attachments/${encodeURIComponent(providerAttachmentId)}/$value`,
+        {
+          headers: { authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+    } catch {
+      throw new ProviderError("Graph attachment endpoint unreachable", "unavailable");
+    }
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new ProviderError("Attachment not found", "not_found", 404);
+      }
+      throw new ProviderError(`Graph attachment fetch failed (${res.status})`, "unavailable", res.status);
+    }
+
+    const arrayBuf = await res.arrayBuffer();
+    return Buffer.from(arrayBuf);
   }
 }
 

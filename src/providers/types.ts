@@ -66,6 +66,18 @@ export interface SendResult {
   providerMessageId: string;
 }
 
+export interface ProviderMessageBody {
+  text?: string;
+  html?: string;
+}
+
+export interface ProviderAttachmentMeta {
+  providerAttachmentId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 /**
  * Adapter contract for provider OAuth connections. HTTP-layer code never
  * talks to Google/Microsoft directly — only to this interface.
@@ -96,6 +108,22 @@ export interface EmailProviderAdapter {
     accessToken: string,
     input: SendMessageInput,
   ): Promise<SendResult>;
+  /** Fetches the plain-text and/or HTML body of a message. */
+  fetchMessageBody(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderMessageBody>;
+  /** Lists attachment metadata for a message (no content). */
+  listAttachments(
+    accessToken: string,
+    providerMessageId: string,
+  ): Promise<ProviderAttachmentMeta[]>;
+  /** Downloads a single attachment's raw bytes. */
+  getAttachment(
+    accessToken: string,
+    providerMessageId: string,
+    providerAttachmentId: string,
+  ): Promise<Buffer>;
 }
 
 /** Error thrown by adapters on protocol/HTTP failures. */
@@ -106,7 +134,8 @@ export class ProviderError extends Error {
       | "unavailable"
       | "rate_limited"
       | "invalid_grant"
-      | "invalid_response" = "unavailable",
+      | "invalid_response"
+      | "not_found" = "unavailable",
     public readonly status?: number,
   ) {
     super(message);

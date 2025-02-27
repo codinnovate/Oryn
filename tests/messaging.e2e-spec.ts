@@ -40,6 +40,9 @@ function fakeAdapter(): EmailProviderAdapter {
     sendMessage: async (_token, _input) => ({
       providerMessageId: `msg-sent-${Date.now()}`,
     }),
+    fetchMessageBody: async () => ({ text: "", html: "" }),
+    listAttachments: async () => [],
+    getAttachment: async () => Buffer.from(""),
   };
 }
 

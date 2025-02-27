@@ -44,6 +44,9 @@ function fakeAdapter(): EmailProviderAdapter {
     }),
     listMessages: async () => ({ messages: [], nextPageToken: null }),
     sendMessage: async () => ({ providerMessageId: "" }),
+    fetchMessageBody: async () => ({ text: "", html: "" }),
+    listAttachments: async () => [],
+    getAttachment: async () => Buffer.from(""),
   };
 }
 

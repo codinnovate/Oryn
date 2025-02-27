@@ -72,6 +72,9 @@ function fakeGmailAdapter(): EmailProviderAdapter {
       };
     },
     sendMessage: async () => ({ providerMessageId: "" }),
+    fetchMessageBody: async () => ({ text: "", html: "" }),
+    listAttachments: async () => [],
+    getAttachment: async () => Buffer.from(""),
   };
 }
 
@@ -231,6 +234,9 @@ describe("SyncService.runAccountSync (integration)", () => {
         nextPageToken: null,
       }),
       sendMessage: async () => ({ providerMessageId: "" }),
+      fetchMessageBody: async () => ({ text: "", html: "" }),
+      listAttachments: async () => [],
+      getAttachment: async () => Buffer.from(""),
     };
 
     const SyncService = (await import("@/modules/sync/sync.service")).SyncService;

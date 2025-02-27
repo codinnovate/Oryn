@@ -2,10 +2,10 @@ import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid 
 import { createdAt, primaryId, updatedAt } from "./_shared";
 
 /**
- * A mailbox message synced from a provider. Metadata only at this stage —
- * bodies/attachments are fetched lazily by the inbox module. Rows are
- * upserted on (emailAccountId, providerMessageId) so repeated syncs are
- * idempotent and flag changes (read/unread) propagate.
+ * A mailbox message synced from a provider. Metadata is populated eagerly by
+ * sync; bodies/attachments are fetched lazily by the inbox module on first
+ * access. Rows are upserted on (emailAccountId, providerMessageId) so
+ * repeated syncs are idempotent and flag changes (read/unread) propagate.
  */
 export const emailMessages = pgTable(
   "email_messages",
@@ -21,6 +21,10 @@ export const emailMessages = pgTable(
     fromAddress: text("from_address"),
     toAddresses: jsonb("to_addresses").notNull().default([]),
     snippet: text("snippet"),
+    /** Plain text body — lazily populated on first fetch. */
+    bodyText: text("body_text"),
+    /** HTML body — lazily populated on first fetch. */
+    bodyHtml: text("body_html"),
     /** "inbound" | "outbound" — resolved against the account address. */
     direction: text("direction").notNull().default("inbound"),
     isRead: boolean("is_read").notNull().default(false),
